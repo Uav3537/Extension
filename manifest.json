@@ -1,0 +1,57 @@
+{
+	"manifest_version": 3,
+
+	"name": "Victory Path Duty",
+	"short_name": "VP EX",
+	"description": "Use Features In Roblox and Discord, created by Uav1010 && dlwnsdud58",
+	"version": "22",
+	"author": "Uav1010 && dlwnsdud58",
+
+	"host_permissions": [
+		"<all_urls>"
+	],
+	"permissions": [
+		"notifications",
+		"contextMenus",
+		"scripting",
+		"storage",
+		"alarms",
+		"cookies",
+		"declarativeNetRequest",
+		"declarativeNetRequestFeedback"
+	],
+	"content_scripts": [
+		{
+			"matches": ["<all_urls>"],
+			"js": ["scripts/content.js"],
+			"run_at": "document_start"
+		}
+	],
+	"background": {
+		"service_worker": "scripts/background.js",
+		"type": "module"
+	},
+	"web_accessible_resources": [
+		{
+            "resources": [
+                "scripts/*",
+                "resources/*",
+                "module/*"
+            ],
+            "matches": ["<all_urls>"]
+		}
+	],
+    "icons": {
+        "128": "resources/icon.png"
+    },
+    "action": {
+        "default_icon": "resources/icon.png"
+    },
+	"declarative_net_request": {
+		"rule_resources": [{
+		"id": "ruleset_1",
+		"enabled": true,
+		"path": "resources/rules.json"
+		}]
+	}
+}

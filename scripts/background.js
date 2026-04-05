@@ -183,8 +183,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true
 })
 
-chrome.declarativeNetRequest.getDynamicRules(console.log);
-
 chrome.declarativeNetRequest.updateDynamicRules({
     addRules: [
       {

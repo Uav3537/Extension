@@ -188,7 +188,7 @@ chrome.declarativeNetRequest.getDynamicRules(console.log);
 chrome.declarativeNetRequest.updateDynamicRules({
     addRules: [
       {
-        "id": 1,
+        "id": 100,
         "priority": 1,
         "action": {
           "type": "modifyHeaders",

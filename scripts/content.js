@@ -3,6 +3,7 @@
 /** @typedef {CommonType & ExtensionType} PType */
 
 ;(async() => {
+    console.log("✅ content.js loaded");
     window.package = {}
     window.package.directory = {
         base: chrome.runtime.getURL(""),
@@ -28,76 +29,81 @@
 
     const worldToken = p.createToken(100)
 
-    window.addEventListener("message", async(event) => {
-        if (event.data.isResponse) return;
-        const {action, content, token, id, title} = event.data
+    window.addEventListener("message", (event) => {
+        if (event.data.token === worldToken && event.ports.length > 0) {
+            port = event.ports[0];
+            port.onmessage = async (event) => {
+                const { action, content, id, title } = event.data;
 
-        const sendResponse = (data) => {
-            window.postMessage({ id: id, token: token, data: data, isResponse: true}, "*")
-        }
-        if(token !== worldToken) return
+                const main = {
+                    chromeAPI: async (path, args = []) => {
+                        const parts = path.split('.');
+                        let parent = null;
+                        let method = chrome;
 
-        const main = {
-            chromeAPI: async (path, args = []) => {
-                const parts = path.split('.');
-                let parent = null;
-                let method = chrome;
-
-                for (const part of parts) {
-                    parent = method;
-                    method = method?.[part];
-                }
-
-                if (typeof method === 'function') {
-                    return await method.apply(parent, Array.isArray(args) ? args : [args]);
-                }
-                throw new Error(`API Path "${path}" not found or not a function`);
-            },
-            extensionAPI: async(path, args = []) => {
-                const parts = path.split('.');
-                let method = p;
-
-                for (const part of parts) {
-                    method = method?.[part];
-                }
-
-                if (typeof method === 'function') {
-                    return await method(...(Array.isArray(args) ? args : [args]));
-                }
-                throw new Error(`API Path "${path}" not found or not a function`);
-            },
-            dataAPI: async () => {
-                return {
-                    serverUrl: p.serverUrl,
-                    manifest: p.manifest,
-                    directory
-                };
-            },
-            insertSrc: (target, url) => {
-                const el = document.getElementById(target)
-                if(!el) throw new Error("el Id not found")
-                const observer = new IntersectionObserver((entries, observer) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            el.src = url;
-                            observer.unobserve(el);
+                        for (const part of parts) {
+                            parent = method;
+                            method = method?.[part];
                         }
-                    });
-                });
 
-                observer.observe(el);
-            }
+                        if (typeof method === 'function') {
+                            return await method.apply(parent, Array.isArray(args) ? args : [args]);
+                        }
+                        throw new Error(`API Path "${path}" not found or not a function`);
+                    },
+                    extensionAPI: async(path, args = []) => {
+                        const parts = path.split('.');
+                        let parent = null;
+                        let method = p;
+
+                        for (const part of parts) {
+                            parent = method;
+                            method = method?.[part];
+                        }
+
+                        if (typeof method === 'function') {
+                            return await method.apply(parent, Array.isArray(args) ? args : [args]);
+                        }
+                        throw new Error(`API Path "${path}" not found or not a function`);
+                    },
+                    dataAPI: async () => {
+                        return {
+                            serverUrl: p.serverUrl,
+                            manifest: p.manifest,
+                            directory
+                        };
+                    },
+                    insertSrc: (target, url) => {
+                        const el = document.getElementById(target)
+                        if(!el) throw new Error("el Id not found")
+                        const observer = new IntersectionObserver((entries, observer) => {
+                            entries.forEach(entry => {
+                                if (entry.isIntersecting) {
+                                    el.src = url;
+                                    observer.unobserve(el);
+                                }
+                            });
+                        });
+
+                        observer.observe(el);
+                    }
+                }
+
+                console.log(`[${title}] -> ${action}`)
+
+                try {
+                    const result = await main[action]?.(...content);
+                    port.postMessage({ id, data: result, success: true });
+                } catch (error) {
+                    port.postMessage({ id, error: error.message, success: false });
+                }
+            };
         }
-
-        console.log(`[${title}] -> ${action}`)
-        const req = main[action]?.(...content)
-        const res = await req
-        sendResponse(res)
-    })
+    }, { once: true });
 
     const register = await p.vigor.fetch(window.package.entry).request()
     chrome.runtime.sendMessage({
-        action: "runScript",
+        action: "insertScript",
         content: {
             name: "register.js",
             code: register,

@@ -1,42 +1,42 @@
+let sharedBridge = null;
+
 const main = {
     dispatch: (worldToken, title) => {
-        return new Proxy({}, {
-            get(target, prop) {
-                return async(...content) => {
-                    const requestId = Math.random().toString(36).substring(2);
+        if (sharedBridge) return sharedBridge;
+        const channel = new MessageChannel();
+        const port = channel.port1;
+        const pendingRequests = new Map();
 
-                    const res = new Promise((resolve, reject) => {
+        port.onmessage = (event) => {
+            const { id, data, error, success } = event.data;
+            if (pendingRequests.has(id)) {
+                const { resolve, reject, timeoutId } = pendingRequests.get(id);
+                clearTimeout(timeoutId);
+                pendingRequests.delete(id);
+                success ? resolve(data) : reject(new Error(error));
+            }
+        };
+
+        window.postMessage({ token: worldToken }, "*", [channel.port2]);
+
+        sharedBridge = new Proxy({}, {
+            get(target, prop) {
+                return (...content) => {
+                    return new Promise((resolve, reject) => {
+                        const requestId = Math.random().toString(36).substring(2);
                         const timeoutId = setTimeout(() => {
-                            window.removeEventListener("message", handler)
-                            reject(new Error(`Request timeout: ${prop}`));
+                            pendingRequests.delete(requestId);
+                            reject(new Error(`Timeout: ${prop}`));
                         }, 60000);
 
-                        const handler = (event) => {
-                            const { token, id, data, isResponse } = event.data;
-
-                            if (!isResponse) return;
-
-                            if (token !== worldToken || id !== requestId) return;
-                            window.removeEventListener("message", handler);
-                            clearTimeout(timeoutId);
-                            resolve(data);
-                        };
-
-                        window.addEventListener("message", handler);
+                        pendingRequests.set(requestId, { resolve, reject, timeoutId });
+                        port.postMessage({ action: prop, content, id: requestId, title });
                     });
-
-                    window.postMessage({
-                        action: prop,
-                        content,
-                        token: worldToken,
-                        id: requestId,
-                        title
-                    }, "*");
-
-                    return res
-                }
+                };
             }
-        })
+        });
+
+        return sharedBridge;
     }
 }
 
